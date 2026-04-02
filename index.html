@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vũ Trụ Tarot | 78 Cards RWS Reader</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Josefin+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { 'title': ['"Cormorant Garamond"', 'serif'], 'body': ['"Josefin Sans"', 'sans-serif'] },
+                    colors: { 'mystic-dark': '#0a0612', 'mystic-purple': '#1e112a', 'mystic-gold': '#d4af37', 'parchment': '#f4eedd' }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background: radial-gradient(circle at top center, #1e112a 0%, #0a0612 100%);
+            color: #f4eedd; font-family: 'Josefin Sans', sans-serif;
+            min-height: 100vh; overflow-x: hidden; background-attachment: fixed;
+        }
+        h1, h2, h3, .font-title { font-family: 'Cormorant Garamond', serif; }
+        
+        @keyframes breathe {
+            0% { transform: scale(1); opacity: 0.6; box-shadow: 0 0 20px rgba(212, 175, 55, 0.1); }
+            50% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 50px rgba(212, 175, 55, 0.5); }
+            100% { transform: scale(1); opacity: 0.6; box-shadow: 0 0 20px rgba(212, 175, 55, 0.1); }
+        }
+        .breathe-circle { animation: breathe 5s infinite ease-in-out; }
+
+        .custom-select-wrapper { position: relative; width: 100%; }
+        .custom-select {
+            appearance: none; -webkit-appearance: none;
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(212, 175, 55, 0.2); border-bottom: 2px solid rgba(212, 175, 55, 0.5);
+            border-radius: 8px 8px 0 0; padding: 12px 16px; padding-right: 30px;
+            color: white; width: 100%; cursor: pointer; transition: all 0.3s;
+            font-family: 'Josefin Sans', sans-serif;
+        }
+        .custom-select:focus { outline: none; border-color: #d4af37; background-color: rgba(212, 175, 55, 0.15); }
+        .custom-select option { background-color: #1e112a; color: white; }
+        .select-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: rgba(212, 175, 55, 0.8); pointer-events: none; }
+
+        .deck-scroll-container {
+            display: flex; overflow-x: auto; padding: 40px calc(50% - 45px);
+            scroll-behavior: smooth; -ms-overflow-style: none; scrollbar-width: none;
+            min-height: 240px; align-items: center;
+        }
+        .deck-scroll-container::-webkit-scrollbar { display: none; }
+        .card-wrapper {
+            flex: 0 0 auto; width: 90px; height: 155px; margin-left: -60px; 
+            transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+            cursor: pointer; position: relative; transform-origin: bottom center;
+        }
+        @media (min-width: 768px) { .card-wrapper { width: 110px; height: 190px; margin-left: -75px; } }
+        .card-wrapper:first-child { margin-left: 0; }
+        .card-wrapper:hover { transform: translateY(-30px) scale(1.1); z-index: 50; margin-right: 30px; }
+        .card-wrapper:hover ~ .card-wrapper { transform: translateX(30px); }
+
+        .card-inner {
+            position: relative; width: 100%; height: 100%;
+            transition: transform 0.8s; transform-style: preserve-3d;
+            box-shadow: -2px 5px 15px rgba(0,0,0,0.6); border-radius: 8px;
+        }
+        .card-wrapper.flipped .card-inner, .card-display.flipped .card-inner { transform: rotateY(180deg); }
+        .card-front, .card-back {
+            position: absolute; width: 100%; height: 100%;
+            -webkit-backface-visibility: hidden; backface-visibility: hidden;
+            border-radius: 8px; overflow: hidden; border: 2px solid #d4af37;
+        }
+        .card-back {
+            background-color: #130a1c;
+            background-image: repeating-linear-gradient(45deg, rgba(212, 175, 55, 0.1) 0, rgba(212, 175, 55, 0.1) 2px, transparent 2px, transparent 8px);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .card-back::after { content: "✧"; color: #d4af37; font-size: 2.5rem; opacity: 0.8; }
+        .card-front { background-color: #f4eedd; transform: rotateY(180deg); }
+        .card-front img { width: 100%; height: 100%; object-fit: cover; }
+
+        .card-fallback {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #f4eedd; z-index: 5; display: flex; flex-direction: column;
+            align-items: center; justify-content: space-between; padding: 12px 6px;
+            color: #2a1b38; border: 4px double #2a1b38; box-sizing: border-box;
+        }
+
+        .step-hidden { display: none !important; }
+        .fade-in { animation: fadeIn 0.8s ease-in forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        .loader {
+            border: 2px solid rgba(212, 175, 55, 0.2); border-radius: 50%;
+            border-top: 2px solid #d4af37; width: 20px; height: 20px;
+            animation: spin 1s linear infinite; display: inline-block; vertical-align: middle;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .selected-slots-container { display: flex; justify-content: center; gap: 15px; margin-bottom: 20px; min-height: 170px; }
+        .slot {
+            width: 95px; height: 165px; border: 2px dashed rgba(212, 175, 55, 0.3); border-radius: 8px;
+            display: flex; align-items: center; justify-content: center; color: rgba(212, 175, 55, 0.4); font-size: 1.5rem;
+            background-color: rgba(0,0,0,0.2);
+        }
+        @media (min-width: 768px) { .slot { width: 115px; height: 195px; gap: 30px;} }
+        .card-display { width: 100%; height: 100%; perspective: 1000px; }
+    </style>
+</head>
+<body class="flex flex-col items-center p-4 md:p-8">
+
+    <div class="max-w-4xl w-full bg-white/5 backdrop-blur-xl border border-mystic-gold/20 rounded-3xl shadow-[0_0_40px_rgba(0,0,0,0.8)] overflow-hidden relative">
+        <div class="absolute top-6 left-6 text-mystic-gold/20 text-3xl"><i class="fa-solid fa-moon"></i></div>
+        <div class="absolute bottom-6 right-6 text-mystic-gold/20 text-3xl"><i class="fa-solid fa-star"></i></div>
+
+        <div class="p-6 md:p-12" id="app-container">
+
+            <!-- BƯỚC 1 -->
+            <div id="step-1" class="flex flex-col items-center text-center fade-in">
+                <h1 class="text-4xl md:text-6xl text-mystic-gold mb-2 font-title tracking-widest drop-shadow-lg">Arcana Reader</h1>
+                <p class="text-gray-400 mb-10 text-lg italic">Lắng nghe lời thì thầm của vũ trụ</p>
+
+                <div class="w-full max-w-md space-y-6 text-left">
+                    <div>
+                        <label class="block text-mystic-gold mb-2 font-title tracking-wider text-lg">Tên gọi của bạn</label>
+                        <input type="text" id="input-name" class="w-full bg-black/40 border border-mystic-gold/30 rounded-lg p-3 text-white focus:outline-none focus:border-mystic-gold transition" placeholder="Nhập tên để vũ trụ gọi bạn...">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-mystic-gold mb-2 font-title tracking-wider text-lg">Ngày sinh</label>
+                        <div class="flex gap-3">
+                            <div class="custom-select-wrapper w-1/3">
+                                <select id="dob-day" class="custom-select"><option value="" disabled selected>Ngày</option></select>
+                                <i class="fa-solid fa-chevron-down select-icon"></i>
+                            </div>
+                            <div class="custom-select-wrapper w-1/3">
+                                <select id="dob-month" class="custom-select"><option value="" disabled selected>Tháng</option></select>
+                                <i class="fa-solid fa-chevron-down select-icon"></i>
+                            </div>
+                            <div class="custom-select-wrapper w-1/3">
+                                <select id="dob-year" class="custom-select"><option value="" disabled selected>Năm</option></select>
+                                <i class="fa-solid fa-chevron-down select-icon"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-mystic-gold mb-2 font-title tracking-wider text-lg">Điều bạn đang băn khoăn</label>
+                        <textarea id="input-question" rows="3" class="w-full bg-black/40 border border-mystic-gold/30 rounded-lg p-3 text-white focus:outline-none focus:border-mystic-gold transition resize-none leading-relaxed" placeholder="Hãy viết chi tiết vấn đề bạn đang gặp phải..."></textarea>
+                    </div>
+
+                    <div class="flex flex-col gap-4 pt-6">
+                        <button onclick="handleOptimize()" id="btn-optimize" class="w-full py-3 border border-mystic-gold/60 text-mystic-gold rounded-lg hover:bg-mystic-gold/10 transition duration-300 font-semibold flex justify-center items-center">
+                            <i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Trợ lý AI tinh chỉnh câu hỏi
+                        </button>
+                        <button onclick="goToStep2()" class="w-full py-4 bg-gradient-to-r from-yellow-600 to-mystic-gold text-mystic-dark font-bold text-lg rounded-lg hover:from-mystic-gold hover:to-yellow-400 transition duration-300 shadow-[0_0_20px_rgba(212,175,55,0.4)]">
+                            Mở Trải Bài <i class="fa-solid fa-arrow-right ml-2"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BƯỚC 2 -->
+            <div id="step-2" class="step-hidden flex flex-col items-center justify-center text-center py-12 min-h-[450px]">
+                <h2 class="text-4xl text-mystic-gold mb-6 font-title tracking-wide">Thả lỏng tâm trí...</h2>
+                <p class="text-xl text-gray-300 mb-12 max-w-md font-light leading-relaxed">Hãy nhắm mắt lại. Hít sâu, thở đều. Tập trung hoàn toàn năng lượng vào câu hỏi của bạn.</p>
+                <div class="relative w-52 h-52 flex items-center justify-center mb-10">
+                    <div class="absolute inset-0 border-2 border-mystic-gold rounded-full breathe-circle"></div>
+                    <div class="absolute inset-4 border border-mystic-gold/50 rounded-full breathe-circle" style="animation-delay: -2s"></div>
+                    <div class="text-7xl font-title text-mystic-gold font-bold drop-shadow-[0_0_10px_rgba(212,175,55,0.8)]" id="countdown">10</div>
+                </div>
+            </div>
+
+            <!-- BƯỚC 3 -->
+            <div id="step-3" class="step-hidden flex flex-col items-center text-center py-4 w-full">
+                <h2 class="text-3xl md:text-4xl text-mystic-gold mb-2 font-title">Lắng nghe trực giác</h2>
+                <p class="text-gray-300 mb-8 text-lg">Chọn <span class="text-mystic-gold font-bold text-2xl">3</span> lá bài thu hút bạn nhất</p>
+
+                <div class="selected-slots-container w-full max-w-2xl" id="selected-slots">
+                    <div class="slot" id="slot-0"><i class="fa-solid fa-plus"></i></div>
+                    <div class="slot" id="slot-1"><i class="fa-solid fa-plus"></i></div>
+                    <div class="slot" id="slot-2"><i class="fa-solid fa-plus"></i></div>
+                </div>
+
+                <div class="w-full relative overflow-hidden mb-8 group" id="deck-area">
+                    <div class="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-[#0a0612] to-transparent z-40 pointer-events-none"></div>
+                    <div class="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-[#0a0612] to-transparent z-40 pointer-events-none"></div>
+                    <div id="deck-scroll" class="deck-scroll-container"></div>
+                </div>
+
+                <div class="h-16 flex items-center justify-center w-full">
+                    <button id="btn-analyze" onclick="goToStep4()" class="hidden px-10 py-4 bg-gradient-to-r from-mystic-gold to-yellow-400 text-mystic-dark font-bold text-lg rounded-full hover:scale-105 transition duration-300 shadow-[0_0_20px_rgba(212,175,55,0.6)] animate-bounce">
+                        <i class="fa-solid fa-eye mr-2"></i> Lắng Nghe Lời Khuyên
+                    </button>
+                    <p id="pick-counter" class="text-mystic-gold text-xl font-title font-bold tracking-widest">0 / 3</p>
+                </div>
+            </div>
+
+            <!-- BƯỚC 4 -->
+            <div id="step-4" class="step-hidden flex flex-col items-center w-full py-4">
+                <h2 class="text-4xl text-mystic-gold mb-10 font-title text-center tracking-wide">Thông Điệp Từ Vũ Trụ</h2>
+                <div id="final-cards-display" class="flex flex-wrap justify-center gap-6 md:gap-12 mb-10 w-full"></div>
+
+                <div class="w-full max-w-4xl bg-black/40 backdrop-blur-md border border-mystic-gold/30 rounded-2xl p-6 md:p-10 text-left text-lg leading-relaxed text-gray-200 shadow-2xl relative">
+                    <i class="fa-solid fa-quote-left absolute top-6 left-6 text-mystic-gold/20 text-4xl"></i>
+                    <div id="reading-content" class="relative z-10 min-h-[200px] font-body mt-4">
+                        <div class="flex flex-col items-center justify-center h-48 text-mystic-gold gap-4">
+                            <div class="loader" style="width: 40px; height: 40px; border-width: 3px;"></div> 
+                            <span class="text-xl font-title animate-pulse">Reader đang giải mã các biểu tượng...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="location.reload()" class="mt-12 px-8 py-3 border border-mystic-gold text-mystic-gold font-bold rounded-lg hover:bg-mystic-gold hover:text-mystic-dark transition duration-300">
+                    <i class="fa-solid fa-rotate-right mr-2"></i> Trải bài mới
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const state = { name: '', dob: '', question: '', selectedCards: [], maxCards: 3 };
+
+        window.onload = () => {
+            const daySel = document.getElementById('dob-day');
+            for(let i=1; i<=31; i++) { let val = i < 10 ? `0${i}` : i; daySel.add(new Option(val, val)); }
+            const monthSel = document.getElementById('dob-month');
+            for(let i=1; i<=12; i++) { let val = i < 10 ? `0${i}` : i; monthSel.add(new Option(`Tháng ${val}`, val)); }
+            const yearSel = document.getElementById('dob-year');
+            const curYear = new Date().getFullYear();
+            for(let i=curYear; i>=1940; i--) { yearSel.add(new Option(i, i)); }
+        };
+
+        function romanize(num) {
+            if (num === 0) return '0';
+            const lookup = {M:1000,CM:900,D:500,CD:400,C:100,XC:90,L:50,XL:40,X:10,IX:9,V:5,IV:4,I:1};
+            let roman = '';
+            for (let i in lookup) { while ( num >= lookup[i] ) { roman += i; num -= lookup[i]; } }
+            return roman;
+        }
+
+        const fullDeck = [];
+        const imgBaseUrl = "https://cdn.jsdelivr.net/gh/ekelen/tarot-api@master/static/cards/"; 
+        const majorNames = ["The Fool", "The Magician", "The High Priestess", "The Empress", "The Emperor", "The Hierophant", "The Lovers", "The Chariot", "Strength", "The Hermit", "Wheel of Fortune", "Justice", "The Hanged Man", "Death", "Temperance", "The Devil", "The Tower", "The Star", "The Moon", "The Sun", "Judgement", "The World"];
+        majorNames.forEach((name, i) => { let num = i < 10 ? `0${i}` : i; fullDeck.push({ name: name, img: `${imgBaseUrl}ar${num}.jpg`, icon: '🔮', symbol: romanize(i) }); });
+        
+        const suits = [{ name: 'Wands', code: 'wa', icon: '🪄' }, { name: 'Cups', code: 'cu', icon: '🏆' }, { name: 'Swords', code: 'sw', icon: '⚔️' }, { name: 'Pentacles', code: 'pe', icon: '🪙' }];
+        const ranks = [{ name: "Ace", code: "ac", symbol: "A" }, { name: "Two", code: "02", symbol: "2" }, { name: "Three", code: "03", symbol: "3" }, { name: "Four", code: "04", symbol: "4" }, { name: "Five", code: "05", symbol: "5" }, { name: "Six", code: "06", symbol: "6" }, { name: "Seven", code: "07", symbol: "7" }, { name: "Eight", code: "08", symbol: "8" }, { name: "Nine", code: "09", symbol: "9" }, { name: "Ten", code: "10", symbol: "10" }, { name: "Page", code: "pa", symbol: "P" }, { name: "Knight", code: "kn", symbol: "Kn" }, { name: "Queen", code: "qu", symbol: "Q" }, { name: "King", code: "ki", symbol: "K" }];
+        suits.forEach(suit => { ranks.forEach(rank => { fullDeck.push({ name: `${rank.name} of ${suit.name}`, img: `${imgBaseUrl}${suit.code}${rank.code}.jpg`, icon: suit.icon, symbol: rank.symbol }); }); });
+
+        // ==========================================
+        // GỌI API QUA BACKEND NETLIFY - BẢO MẬT KEY
+        // ==========================================
+        async function callGeminiSecure(prompt, systemInstruction = "") {
+            for (let i = 0; i < 3; i++) {
+                try {
+                    // Thay vì gọi Google, gọi hàm backend của chính web bạn
+                    const res = await fetch('/api/gemini', { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' }, 
+                        body: JSON.stringify({ prompt, systemInstruction }) 
+                    });
+                    
+                    if (!res.ok) throw new Error(`Lỗi Server`);
+                    const data = await res.json();
+                    return data.text; // Netlify Function sẽ trả về object { text: "kết quả" }
+                } catch (err) {
+                    if (i === 2) return "Năng lượng vũ trụ đang nhiễu loạn. Xin hãy làm mới trang và thử lại nhé.";
+                    await new Promise(r => setTimeout(r, 1000));
+                }
+            }
+        }
+
+        function parseMarkdown(text) {
+            let html = text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-mystic-gold font-bold">$1</strong>')
+                           .replace(/\*(.*?)\*/g, '<em class="text-gray-300 italic">$1</em>')
+                           .replace(/### (.*?)\n/g, '<h3 class="text-2xl text-mystic-gold mt-6 mb-3 font-title">$1</h3>\n')
+                           .replace(/## (.*?)\n/g, '<h2 class="text-3xl text-mystic-gold mt-8 mb-4 font-title border-b border-mystic-gold/20 pb-2">$1</h2>\n')
+                           .replace(/\n\n/g, '</p><p class="mb-5 text-justify">')
+                           .replace(/\n/g, '<br>')
+                           .replace(/- (.*?)(<br>|<\/p>)/g, '<li class="ml-6 mb-2 list-disc marker:text-mystic-gold">$1</li>$2');
+            return `<p class="mb-5 leading-relaxed text-justify">${html}</p>`;
+        }
+
+        function switchStep(fromStep, toStep) {
+            document.getElementById(`step-${fromStep}`).classList.add('step-hidden');
+            const nextEl = document.getElementById(`step-${toStep}`);
+            nextEl.classList.remove('step-hidden'); nextEl.classList.add('fade-in');
+        }
+
+        async function handleOptimize() {
+            const qInput = document.getElementById('input-question');
+            const btn = document.getElementById('btn-optimize');
+            if(!qInput.value.trim()) return alert("Vui lòng cho Vũ trụ biết điều bạn đang băn khoăn.");
+
+            const originHtml = btn.innerHTML;
+            btn.innerHTML = `<div class="loader mr-2"></div> Đang kết nối AI...`; btn.disabled = true;
+
+            // Dùng hàm Secure gọi Backend
+            const res = await callGeminiSecure(`Viết lại câu sau thành 1 câu hỏi Tarot thật tinh tế, ngắn gọn, súc tích, dạng câu hỏi mở tìm lời khuyên: "${qInput.value}"`);
+            qInput.value = res.trim().replace(/^"|"$/g, '').replace(/^\*|\*$/g, '');
+            btn.innerHTML = originHtml; btn.disabled = false;
+        }
+
+        function goToStep2() {
+            state.name = document.getElementById('input-name').value.trim() || 'Bạn';
+            const d = document.getElementById('dob-day').value;
+            const m = document.getElementById('dob-month').value;
+            const y = document.getElementById('dob-year').value;
+            if(d && m && y) state.dob = `${d}/${m}/${y}`;
+
+            state.question = document.getElementById('input-question').value.trim();
+            if (!state.question) return alert("Bạn cần đặt câu hỏi trong tâm trí trước khi rút bài.");
+
+            switchStep(1, 2); startCountdown();
+        }
+
+        function startCountdown() {
+            let t = 10;
+            const timer = setInterval(() => {
+                t--; document.getElementById('countdown').innerText = t;
+                if (t <= 0) { clearInterval(timer); goToStep3(); }
+            }, 1000);
+        }
+
+        function goToStep3() { switchStep(2, 3); renderDeck(); }
+
+        function renderDeck() {
+            const container = document.getElementById('deck-scroll');
+            let deck = [...fullDeck].sort(() => 0.5 - Math.random());
+            deck.forEach((card, i) => {
+                const cardEl = document.createElement('div');
+                cardEl.className = 'card-wrapper';
+                cardEl.onclick = () => selectCard(cardEl, card);
+                cardEl.innerHTML = `<div class="card-inner"><div class="card-back"></div><div class="card-front"></div></div>`;
+                container.appendChild(cardEl);
+            });
+        }
+
+        function selectCard(element, cardData) {
+            if (state.selectedCards.length >= state.maxCards) return;
+            const slotIdx = state.selectedCards.length;
+            state.selectedCards.push(cardData);
+
+            element.style.opacity = '0'; element.style.pointerEvents = 'none';
+
+            const slotEl = document.getElementById(`slot-${slotIdx}`);
+            slotEl.classList.remove('border-dashed', 'border-2', 'background-color');
+            slotEl.innerHTML = `
+                <div class="card-display flipped">
+                    <div class="card-inner">
+                        <div class="card-back"></div>
+                        <div class="card-front relative bg-parchment">
+                            <div class="card-fallback">
+                                <div class="text-sm font-title font-bold">${cardData.symbol}</div>
+                                <div class="text-3xl">${cardData.icon}</div>
+                                <div class="font-title font-bold text-center uppercase text-[10px] leading-tight">${cardData.name}</div>
+                            </div>
+                            <img src="${cardData.img}" alt="${cardData.name}" class="absolute inset-0 z-10 w-full h-full object-cover" onerror="this.style.display='none'">
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('pick-counter').innerText = `${state.selectedCards.length} / 3`;
+            if (state.selectedCards.length === 3) {
+                document.getElementById('deck-area').classList.add('opacity-30', 'pointer-events-none');
+                document.getElementById('pick-counter').classList.add('hidden');
+                document.getElementById('btn-analyze').classList.remove('hidden');
+            }
+        }
+
+        function goToStep4() { switchStep(3, 4); renderFinalCards(); fetchReading(); }
+
+        function renderFinalCards() {
+            const container = document.getElementById('final-cards-display');
+            const pos = ["Quá Khứ / Gốc Rễ", "Hiện Tại / Vấn Đề", "Tương Lai / Lời Khuyên"];
+            container.innerHTML = state.selectedCards.map((card, i) => `
+                <div class="flex flex-col items-center animate-fade-in w-28 md:w-36" style="animation-delay: ${i * 0.3}s">
+                    <div class="w-full aspect-[1/1.7] rounded-lg overflow-hidden border-2 border-mystic-gold shadow-[0_0_20px_rgba(212,175,55,0.4)] relative bg-parchment">
+                        <div class="card-fallback">
+                            <div class="text-sm font-title font-bold">${card.symbol}</div>
+                            <div class="text-4xl">${card.icon}</div>
+                            <div class="font-title font-bold text-center uppercase text-sm leading-tight">${card.name}</div>
+                        </div>
+                        <img src="${card.img}" alt="${card.name}" class="absolute inset-0 z-10 w-full h-full object-cover" onerror="this.style.display='none'">
+                    </div>
+                    <span class="text-[10px] md:text-xs text-mystic-gold mt-4 uppercase tracking-widest font-semibold text-center border-b border-mystic-gold/30 pb-1">${pos[i]}</span>
+                    <span class="text-sm md:text-base font-bold text-white text-center px-1 font-title mt-2">${card.name}</span>
+                </div>
+            `).join('');
+        }
+
+        async function fetchReading() {
+            const box = document.getElementById('reading-content');
+            const sys = "Bạn là một Tarot Reader người Việt Nam uyên bác, thấu cảm. Bạn sử dụng bộ bài Rider-Waite-Smith 78 lá. Giọng văn của bạn nhẹ nhàng, chữa lành, sâu sắc và thực tế. Xưng 'mình' và gọi người dùng là 'bạn'.";
+            const dobTxt = state.dob ? `, sinh ngày ${state.dob}` : "";
+            const prompt = `
+                Người hỏi: ${state.name}${dobTxt}. Vấn đề: "${state.question}"
+                Bài: 1. ${state.selectedCards[0].name} 2. ${state.selectedCards[1].name} 3. ${state.selectedCards[2].name}
+                Hãy đọc bài cho họ. Phân tích chi tiết và đưa ra lời khuyên. Định dạng Markdown.
+            `;
+            
+            // Dùng hàm Secure gọi Backend
+            const res = await callGeminiSecure(prompt, sys);
+            box.innerHTML = parseMarkdown(res);
+        }
+    </script>
+</body>
+</html>
+
